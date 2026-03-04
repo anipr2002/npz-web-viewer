@@ -1,25 +1,11 @@
 services:
-  backend:
-    build:
-      context: ./npz_viewer_backend
-      dockerfile: Dockerfile
-    container_name: backend
-    ports:
-      - "8000:8000"
-
   client:
     build:
       context: ./npz_viewer_client
       dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: "http://backend:8000"
     container_name: client
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: "http://localhost:8000"
-    depends_on:
-      - backend
 
 networks:
   default:

@@ -45,9 +45,8 @@ Welcome to the **NPZ/NPY Web Viewer**, a modern, feature-rich tool designed for 
 
 ### ⚡ **Fast and Efficient**
 
-- Powered by modern frameworks:
-  - Backend: **FastAPI** for robust data handling.
-  - Frontend: **Next.js** with React for a seamless UI.
+- Powered by **Next.js** with React for a seamless UI.
+- All processing happens client-side — no backend required.
 
 ---
 
@@ -55,42 +54,16 @@ Welcome to the **NPZ/NPY Web Viewer**, a modern, feature-rich tool designed for 
 
 ### Prerequisites
 
-- Node.js >= 14.x
-- Python >= 3.9
-- Docker
+- Node.js >= 18.x
+- Docker (optional)
 
-### Backend Setup
+### Setup
 
 1. Clone the repository:
 
    ```bash
    git clone https://github.com/<your-username>/npz-web-viewer.git
-   cd npz-web-viewer/backend
-   ```
-
-2. Install dependencies using Poetry:
-
-   ```bash
-   poetry install
-   ```
-
-   This will install all required packages including:
-
-   - FastAPI for the web server
-   - NumPy for array handling
-   - scikit-learn for machine learning algorithms
-
-3. Start the backend server:
-   ```bash
-   poetry run uvicorn app.main:app --reload
-   ```
-
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-
-   ```bash
-   cd ../frontend
+   cd npz-web-viewer/npz_viewer_client
    ```
 
 2. Install dependencies:
@@ -151,9 +124,8 @@ To run both the backend and the frontend services together:
 
    This will:
 
-   - Build the backend and frontend Docker images.
-   - Start the services and expose them on the following ports:
-     - **Backend**: [http://localhost:8000](http://localhost:8000)
+   - Build the frontend Docker image.
+   - Start the service and expose it on:
      - **Frontend**: [http://localhost:3000](http://localhost:3000)
 
 ---
@@ -167,18 +139,6 @@ docker-compose up -d
 ```
 
 ---
-
-### Environment Variables
-
-1. **Backend:**
-
-   - Ensure the `ALLOWED_ORIGINS` environment variable in the `.env` file includes the frontend URL (e.g., `http://localhost:3000`).
-
-2. **Frontend:**
-   - Set the `NEXT_PUBLIC_API_URL` in the frontend `.env` file to point to the backend URL:
-     ```env
-     NEXT_PUBLIC_API_URL=http://localhost:8000
-     ```
 
 ---
 

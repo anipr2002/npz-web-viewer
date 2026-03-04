@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileType, Trash2 } from "lucide-react";
+import { Upload, FileType, Trash2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -12,14 +12,39 @@ interface FileDropzoneProps {
   setFiles: (files: File[]) => void;
 }
 
+const MAX_FILE_SIZE_MB = 50;
+const ALLOWED_EXTENSIONS = ["npy", "npz"];
+
+function validateFiles(files: File[]): string | null {
+  for (const file of files) {
+    const ext = file.name.toLowerCase().split(".").pop();
+    if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
+      return `"${file.name}" is not a supported file type. Only .npy and .npz files are allowed.`;
+    }
+    const sizeMB = file.size / (1024 * 1024);
+    if (sizeMB > MAX_FILE_SIZE_MB) {
+      return `"${file.name}" exceeds the ${MAX_FILE_SIZE_MB}MB limit (${sizeMB.toFixed(1)} MB).`;
+    }
+  }
+  return null;
+}
+
 export default function FileDropzone({ files, setFiles }: FileDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   // Tracks the indices of files that have been clicked (and thus show the delete icon)
   const [activeFileIndices, setActiveFileIndices] = useState<number[]>([]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFiles(Array.from(e.target.files)); // Handle multiple files
+      const selected = Array.from(e.target.files);
+      const error = validateFiles(selected);
+      if (error) {
+        setValidationError(error);
+        return;
+      }
+      setValidationError(null);
+      setFiles(selected);
     }
   };
 
@@ -37,7 +62,14 @@ export default function FileDropzone({ files, setFiles }: FileDropzoneProps) {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files) {
-      setFiles(Array.from(e.dataTransfer.files)); // Handle multiple files
+      const dropped = Array.from(e.dataTransfer.files);
+      const error = validateFiles(dropped);
+      if (error) {
+        setValidationError(error);
+        return;
+      }
+      setValidationError(null);
+      setFiles(dropped);
     }
   };
 
@@ -61,9 +93,11 @@ export default function FileDropzone({ files, setFiles }: FileDropzoneProps) {
     <Card
       className={cn(
         "p-8 border-2 border-dashed transition-colors duration-200",
-        isDragging
-          ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950"
-          : "border-gray-200 dark:border-gray-800",
+        validationError
+          ? "border-red-500 bg-red-50 dark:bg-red-950/20"
+          : isDragging
+            ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950"
+            : "border-gray-200 dark:border-gray-800",
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -97,6 +131,13 @@ export default function FileDropzone({ files, setFiles }: FileDropzoneProps) {
         >
           Select Files
         </label>
+
+        {validationError && (
+          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{validationError}</span>
+          </div>
+        )}
 
         {files.length > 0 && (
           <div className="flex flex-col items-center space-y-2 text-sm text-gray-500 dark:text-gray-400">

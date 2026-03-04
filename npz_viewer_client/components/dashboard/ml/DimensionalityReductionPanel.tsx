@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import DimensionalityVisualization from "./DimensionalityVisualization";
 
 interface ArrayData {
@@ -33,18 +34,20 @@ export default function DimensionalityReductionPanel({
   const [algorithm, setAlgorithm] = useState("pca");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // PCA parameters
   const [nComponents, setNComponents] = useState(2);
 
   const runDimensionalityReduction = async () => {
     setLoading(true);
+    setError(null);
 
     try {
       const params = { n_components: nComponents };
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/ml/dimensionality_reduction`,
+        `/api/ml/dimensionality_reduction`,
         {
           method: "POST",
           headers: {
@@ -65,9 +68,11 @@ export default function DimensionalityReductionPanel({
       const data = await response.json();
       setResults(data);
       toast.success(`${algorithm.toUpperCase()} completed successfully!`);
-    } catch (error) {
-      console.error("Dimensionality reduction error:", error);
-      toast.error("An error occurred during dimensionality reduction");
+    } catch (err) {
+      console.error("Dimensionality reduction error:", err);
+      const message = err instanceof Error ? err.message : "An error occurred during dimensionality reduction";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -120,6 +125,19 @@ export default function DimensionalityReductionPanel({
           "Run Dimensionality Reduction"
         )}
       </Button>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Dimensionality reduction failed</AlertTitle>
+          <AlertDescription className="flex items-center justify-between gap-4">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={runDimensionalityReduction} className="shrink-0">
+              <RefreshCw className="mr-1 h-3 w-3" /> Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {results && (
         <Card className="mt-4">

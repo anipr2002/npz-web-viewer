@@ -1,4 +1,4 @@
-import React, { useMemo, memo } from "react";
+import React, { useMemo, memo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -7,11 +7,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 
 interface Table2DProps {
   data: number[][];
   fileName: string;
 }
+
+const ROW_DISPLAY_LIMIT = 500;
 
 // A memoized row component to avoid unnecessary re-renders when its props do not change
 const MemoizedTableRow: React.FC<{ row: number[] }> = memo(({ row }) => {
@@ -27,6 +30,11 @@ const MemoizedTableRow: React.FC<{ row: number[] }> = memo(({ row }) => {
 });
 
 const Table2D: React.FC<Table2DProps> = ({ data }) => {
+  const [showAll, setShowAll] = useState(false);
+
+  const isTruncated = data.length > ROW_DISPLAY_LIMIT;
+  const displayData = showAll ? data : data.slice(0, ROW_DISPLAY_LIMIT);
+
   // Memoize header cells so they are only recalculated if the data changes
   const headerCells = useMemo(
     () =>
@@ -41,14 +49,28 @@ const Table2D: React.FC<Table2DProps> = ({ data }) => {
   // Memoize table rows
   const tableRows = useMemo(
     () =>
-      data.map((row, rowIndex) => (
+      displayData.map((row, rowIndex) => (
         <MemoizedTableRow key={rowIndex} row={row} />
       )),
-    [data]
+    [displayData]
   );
 
   return (
     <div>
+      {isTruncated && (
+        <div className="flex items-center justify-between mb-2 text-sm text-muted-foreground">
+          <span>
+            Showing {showAll ? data.length : ROW_DISPLAY_LIMIT} of {data.length} rows
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAll((prev) => !prev)}
+          >
+            {showAll ? "Show fewer rows" : "Show all rows"}
+          </Button>
+        </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow>{headerCells}</TableRow>

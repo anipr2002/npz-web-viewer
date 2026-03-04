@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -14,8 +13,9 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import ClusteringVisualization from "./ClusteringVisualization";
 
 interface ArrayData {
@@ -33,6 +33,7 @@ export default function ClusteringPanel({ arrayData }: ClusteringPanelProps) {
   const [normalize, setNormalize] = useState(true);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // K-means parameters
   const [nClusters, setNClusters] = useState(3);
@@ -43,6 +44,7 @@ export default function ClusteringPanel({ arrayData }: ClusteringPanelProps) {
 
   const runClustering = async () => {
     setLoading(true);
+    setError(null);
 
     try {
       const params =
@@ -51,7 +53,7 @@ export default function ClusteringPanel({ arrayData }: ClusteringPanelProps) {
           : { eps, min_samples: minSamples };
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/ml/clustering`,
+        `/api/ml/clustering`,
         {
           method: "POST",
           headers: {
@@ -75,9 +77,11 @@ export default function ClusteringPanel({ arrayData }: ClusteringPanelProps) {
       toast.success(
         `${algorithm.toUpperCase()} clustering completed successfully!`
       );
-    } catch (error) {
-      console.error("Clustering error:", error);
-      toast.error("An error occurred during clustering");
+    } catch (err) {
+      console.error("Clustering error:", err);
+      const message = err instanceof Error ? err.message : "An error occurred during clustering";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -164,6 +168,19 @@ export default function ClusteringPanel({ arrayData }: ClusteringPanelProps) {
           "Run Clustering"
         )}
       </Button>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Clustering failed</AlertTitle>
+          <AlertDescription className="flex items-center justify-between gap-4">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={runClustering} className="shrink-0">
+              <RefreshCw className="mr-1 h-3 w-3" /> Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {results && (
         <Card className="mt-4">

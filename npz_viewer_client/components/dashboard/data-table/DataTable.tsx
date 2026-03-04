@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Lenis from "lenis";
+import { useEffect, useState } from "react";
 import { downloadCSV } from "@/utils/csv-utils";
 import Table2D from "./Table2d";
 import MultiDimensionalArray from "./MultiDimensionalArray";
 import { Button } from "@/components/ui/button";
-import { ChevronsDown, Copy, Check } from "lucide-react";
+import { Copy, Check, Download } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -58,15 +57,9 @@ function ChartRenderer({
 }
 
 export default function DataTable({ data }: DataTableProps) {
-  const downloadButtonRefs = useRef<Record<string, HTMLButtonElement | null>>(
-    {}
-  );
   const [chartType, setChartType] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedArrayKey, setSelectedArrayKey] = useState<string | null>(null);
-  const [currentDownloadIndex, setCurrentDownloadIndex] = useState(0);
-  const [downloadButtons, setDownloadButtons] = useState<string[]>([]);
-
   // Set initial selections when data is loaded
   useEffect(() => {
     if (Object.keys(data).length > 0) {
@@ -79,49 +72,6 @@ export default function DataTable({ data }: DataTableProps) {
       }
     }
   }, [data]);
-
-  // Build a list of all download button IDs
-  useEffect(() => {
-    const buttons: string[] = [];
-    Object.entries(data).forEach(([fileName, arrays]) => {
-      Object.entries(arrays).forEach(([arrayName, arrayData]) => {
-        if (arrayData.ndim === 2) {
-          buttons.push(`${fileName}-${arrayName}`);
-        }
-      });
-    });
-    setDownloadButtons(buttons);
-  }, [data]);
-
-  useEffect(() => {
-    const lenis = new Lenis();
-
-    function raf(time: any) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    }
-
-    requestAnimationFrame(raf);
-
-    return () => {
-      lenis.destroy();
-    };
-  }, []);
-
-  const scrollToNextDownload = () => {
-    if (downloadButtons.length === 0) return;
-
-    // Move to the next download button
-    const nextIndex = (currentDownloadIndex + 1) % downloadButtons.length;
-    setCurrentDownloadIndex(nextIndex);
-
-    const buttonId = downloadButtons[nextIndex];
-    const buttonElement = downloadButtonRefs.current[buttonId];
-
-    if (buttonElement) {
-      buttonElement.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  };
 
   function ArrayCopyBtn({ text }: { text: string }) {
     const [copied, setCopied] = useState(false);
@@ -148,15 +98,6 @@ export default function DataTable({ data }: DataTableProps) {
 
   return (
     <div className="space-y-6">
-      {/* Scroll to Download Button */}
-      <button
-        onClick={scrollToNextDownload}
-        className="fixed bottom-4 right-4 bg-indigo-600 text-white p-2 rounded-full shadow-lg hover:bg-indigo-700 transition-colors z-10"
-        aria-label="Scroll to next download"
-      >
-        <ChevronsDown className="h-6 w-6" />
-      </button>
-
       <div>
         {Object.entries(data).map(([fileName, arrays]) => (
           <div key={fileName} className="mb-8">
@@ -186,21 +127,18 @@ export default function DataTable({ data }: DataTableProps) {
 
                   {arrayData.ndim === 2 ? (
                     <div>
-                      <Table2D data={arrayData.data} fileName={buttonId} />
-
-                      <div className="flex w-full items-center justify-between mt-4">
+                      <div className="flex w-full items-center justify-between mb-4">
                         <div className="flex space-x-2">
+                          <ArrayCopyBtn text={formattedText} />
                           <Button
-                            ref={(el) => {
-                              downloadButtonRefs.current[buttonId] = el;
-                            }}
                             variant="outline"
                             size="sm"
                             onClick={() => {
                               downloadCSV(arrayData.data, buttonId);
                             }}
                           >
-                            Download CSV
+                            <Download className="h-4 w-4" />
+                            <span>Download CSV</span>
                           </Button>
 
                           <Select
@@ -229,20 +167,18 @@ export default function DataTable({ data }: DataTableProps) {
                             </SelectContent>
                           </Select>
                         </div>
-
-                        <div>
-                          <ArrayCopyBtn text={formattedText} />
-                        </div>
                       </div>
 
                       {chartType && (
-                        <div className="mt-4">
+                        <div className="mb-4">
                           <ChartRenderer
                             arrayData={arrayData}
                             chartType={chartType}
                           />
                         </div>
                       )}
+
+                      <Table2D data={arrayData.data} fileName={buttonId} />
 
                       {/* ML Panel for each 2D array */}
                       <div className="mt-6">
@@ -255,7 +191,7 @@ export default function DataTable({ data }: DataTableProps) {
                     </div>
                   ) : (
                     <div>
-                      <div className="flex items-center justify-end mb-2">
+                      <div className="flex items-center justify-start mb-4">
                         <ArrayCopyBtn text={formattedText} />
                       </div>
                       <MultiDimensionalArray data={arrayData.data} depth={0} />

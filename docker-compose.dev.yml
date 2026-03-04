@@ -1,16 +1,4 @@
 services:
-  backend:
-    build:
-      context: ./npz_viewer_backend
-      dockerfile: Dockerfile
-    container_name: backend-dev
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./npz_viewer_backend:/app
-      - backend_poetry_cache:/root/.cache/pypoetry
-    command: poetry run uvicorn npz_viewer_backend.app.main:app --host 0.0.0.0 --port 8000 --reload
-
   client:
     build:
       context: ./npz_viewer_client
@@ -22,14 +10,7 @@ services:
       - ./npz_viewer_client:/app
       - /app/node_modules
       - /app/.next
-    environment:
-      NEXT_PUBLIC_API_URL: "http://localhost:8000"
     command: npm run dev
-    depends_on:
-      - backend
-
-volumes:
-  backend_poetry_cache:
 
 networks:
   default:

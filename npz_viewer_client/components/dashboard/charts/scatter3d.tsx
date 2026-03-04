@@ -61,9 +61,9 @@ export default function Scatter3D({ data }: Scatter3DProps) {
     setClientData({ x, y, z });
   }, [data]);
 
-  // If clientData is not yet set, show a loading message
+  // If clientData is not yet set, show a loading skeleton
   if (!clientData) {
-    return <div>Loading 3D scatter plot data...</div>;
+    return <ScatterSkeleton />;
   }
 
   return (

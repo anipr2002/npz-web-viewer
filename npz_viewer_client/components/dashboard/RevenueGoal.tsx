@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Coffee, ExternalLink } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Coffee, Crown, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import RateLimitedCheckoutButton from "@/components/RateLimitedCheckoutButton";
+import { useAuth } from "@clerk/nextjs";
 
 /* ─────────────────────────────────────────────────────────
  * ANIMATION STORYBOARD
@@ -81,6 +83,16 @@ function ProgressRing({ percent }: { percent: number }) {
 export default function RevenueGoal() {
   const [open, setOpen] = useState(false);
   const [revenue, setRevenue] = useState({ polar: 0, bmac: 0 });
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  };
 
   useEffect(() => {
     fetch("/api/revenue")
@@ -89,14 +101,15 @@ export default function RevenueGoal() {
       .catch(() => {});
   }, []);
 
+  const { isSignedIn } = useAuth();
   const collected = revenue.polar + revenue.bmac;
   const percent = Math.min((collected / GOAL_AMOUNT) * 100, 100);
 
   return (
     <div
-      className="absolute top-4 left-4 sm:top-6 sm:left-6 z-50"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      className="absolute top-4 left-4 sm:top-6 sm:left-6 z-50 pb-2"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* Pill trigger with radial ring */}
       <button
@@ -117,6 +130,8 @@ export default function RevenueGoal() {
                     bg-white dark:bg-gray-900 shadow-lg p-3.5
                     transition-all duration-200 origin-top-left
                     ${open ? "opacity-100 scale-100 translate-y-0 pointer-events-auto" : "opacity-0 scale-95 -translate-y-1 pointer-events-none"}`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Header with progress */}
         <div className="flex items-center justify-between mb-2">
@@ -158,20 +173,37 @@ export default function RevenueGoal() {
           released monthly after arrival.
         </p>
 
-        <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-          <Coffee className="h-3 w-3 text-amber-500 shrink-0" />
-          <p className="text-[11px] text-gray-500 dark:text-gray-400">
-            Want to help?{" "}
-            <Link
-              href={process.env.NEXT_PUBLIC_BUY_ME_A_COFFEE_URL || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-0.5 font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-            >
-              Buy me a coffee
-              <ExternalLink className="h-2.5 w-2.5" />
-            </Link>
-          </p>
+        <div className="flex flex-col gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <Crown className="h-3 w-3 text-indigo-500 shrink-0" />
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+              {isSignedIn ? (
+                <RateLimitedCheckoutButton className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline text-[11px]">
+                  Get Pro — $3.49
+                </RateLimitedCheckoutButton>
+              ) : (
+                <Link href="/sign-in" className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                  Get Pro — $3.49
+                </Link>
+              )}
+              <span className="text-gray-400 dark:text-gray-500"> · removes ads, unlocks features</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Coffee className="h-3 w-3 text-amber-500 shrink-0" />
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+              <Link
+                href={process.env.NEXT_PUBLIC_BUY_ME_A_COFFEE_URL || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-0.5 font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                Buy me a coffee
+                <ExternalLink className="h-2.5 w-2.5" />
+              </Link>
+              <span className="text-gray-400 dark:text-gray-500"> · one-time tip</span>
+            </p>
+          </div>
         </div>
       </div>
     </div>

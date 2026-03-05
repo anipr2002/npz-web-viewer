@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import FileUploader from "@/components/dashboard/file-uploader/FileUploader";
 import { GithubIcon, Bug, Coffee } from "lucide-react";
 import Link from "next/link";

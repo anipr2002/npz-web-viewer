@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/dialog";
 import { useState } from "react";
 
-function ProBadge() {
+function ProBadge({ isSignedIn }: { isSignedIn: boolean }) {
   const [open, setOpen] = useState(false);
-  const orderDetails = useQuery(api.polar.getProOrderDetails);
+  const orderDetails = useQuery(api.polar.getProOrderDetails, isSignedIn ? {} : "skip");
 
   if (!orderDetails) return null;
 
@@ -77,7 +77,7 @@ export default function AuthButton() {
   if (isSignedIn) {
     return (
       <div className="flex items-center gap-2">
-        <ProBadge />
+        <ProBadge isSignedIn={!!isSignedIn} />
         <UserButton />
       </div>
     );

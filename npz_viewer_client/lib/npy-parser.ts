@@ -8,6 +8,7 @@ const MAGIC = [0x93, 0x4e, 0x55, 0x4d, 0x50, 0x59]; // \x93NUMPY
 interface NpyResult {
   shape: number[];
   ndim: number;
+  dtype: string;
   data: any[];
 }
 
@@ -26,6 +27,11 @@ interface DtypeInfo {
   bytes: number;
 }
 
+interface BigDtypeInfo {
+  bigConstructor: BigInt64ArrayConstructor | BigUint64ArrayConstructor;
+  bytes: 8;
+}
+
 const DTYPE_MAP: Record<string, DtypeInfo> = {
   '|b1': { constructor: Uint8Array, bytes: 1 },
   '|u1': { constructor: Uint8Array, bytes: 1 },
@@ -42,6 +48,13 @@ const DTYPE_MAP: Record<string, DtypeInfo> = {
   '>f4': { constructor: Float32Array, bytes: 4 },
   '<f8': { constructor: Float64Array, bytes: 8 },
   '>f8': { constructor: Float64Array, bytes: 8 },
+};
+
+const BIG_DTYPE_MAP: Record<string, BigDtypeInfo> = {
+  '<i8': { bigConstructor: BigInt64Array, bytes: 8 },
+  '>i8': { bigConstructor: BigInt64Array, bytes: 8 },
+  '<u8': { bigConstructor: BigUint64Array, bytes: 8 },
+  '>u8': { bigConstructor: BigUint64Array, bytes: 8 },
 };
 
 function parseHeader(buffer: ArrayBuffer): {
@@ -131,6 +144,20 @@ export function parseNpy(buffer: ArrayBuffer): NpyResult {
     throw new Error('Fortran-order arrays are not supported');
   }
 
+  const totalElements = shape.length === 0 ? 1 : shape.reduce((a, b) => a * b, 1);
+  const isBigEndian = descr.startsWith('>');
+
+  // Handle 64-bit integer dtypes via BigInt typed arrays
+  const bigDtypeInfo = BIG_DTYPE_MAP[descr];
+  if (bigDtypeInfo) {
+    const dataBytes = buffer.slice(dataOffset, dataOffset + totalElements * 8);
+    if (isBigEndian) swapBytes(dataBytes, 8);
+    const typedArray = new bigDtypeInfo.bigConstructor(dataBytes);
+    // Convert BigInt to Number (precision loss only beyond ±2^53, acceptable for ML data)
+    const flat = Array.from(typedArray, (v) => Number(v));
+    return { shape, ndim: shape.length, dtype: descr, data: reshape(flat, shape) };
+  }
+
   // Handle boolean dtype
   const lookupKey = descr === '|b1' ? '|b1' : descr;
   const dtypeInfo = DTYPE_MAP[lookupKey];
@@ -138,11 +165,8 @@ export function parseNpy(buffer: ArrayBuffer): NpyResult {
     throw new Error(`Unsupported dtype: ${descr}`);
   }
 
-  const totalElements = shape.length === 0 ? 1 : shape.reduce((a, b) => a * b, 1);
   const dataBytes = buffer.slice(dataOffset, dataOffset + totalElements * dtypeInfo.bytes);
 
-  // Handle big-endian byte swapping
-  const isBigEndian = descr.startsWith('>');
   if (isBigEndian && dtypeInfo.bytes > 1) {
     swapBytes(dataBytes, dtypeInfo.bytes);
   }
@@ -153,6 +177,7 @@ export function parseNpy(buffer: ArrayBuffer): NpyResult {
   return {
     shape,
     ndim: shape.length,
+    dtype: descr,
     data: reshape(flat, shape),
   };
 }

@@ -17,19 +17,26 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import DimensionalityVisualization from "./DimensionalityVisualization";
+import PythonCodeButton from "../PythonCodeButton";
+import { generatePCACode } from "@/lib/python-codegen";
 
 interface ArrayData {
   size: any;
   ndim: number;
+  dtype?: string;
   data: any[];
 }
 
 interface DimensionalityReductionPanelProps {
   arrayData: ArrayData;
+  fileName?: string;
+  arrayName?: string;
 }
 
 export default function DimensionalityReductionPanel({
   arrayData,
+  fileName = "data.npz",
+  arrayName = "arr",
 }: DimensionalityReductionPanelProps) {
   const [algorithm, setAlgorithm] = useState("pca");
   const [loading, setLoading] = useState(false);
@@ -175,6 +182,14 @@ export default function DimensionalityReductionPanel({
               reducedData={results.reduced_data}
               algorithm={algorithm}
             />
+
+            <div className="mt-4">
+              <PythonCodeButton
+                generateCode={() =>
+                  generatePCACode(fileName, arrayName, nComponents)
+                }
+              />
+            </div>
           </CardContent>
         </Card>
       )}

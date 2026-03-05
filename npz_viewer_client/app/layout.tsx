@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { roger } from "@/components/fonts/fonts";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Analytics } from "@vercel/analytics/next";
+import { ClerkProvider } from "@clerk/nextjs";
+import ConvexClientProvider from "./ConvexClientProvider";
 
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -96,7 +98,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${roger.variable} antialiased`}
       >
-        {children}
+        <ClerkProvider>
+          <ConvexClientProvider>{children}</ConvexClientProvider>
+        </ClerkProvider>
+
         <Analytics />
         <Toaster richColors />
       </body>

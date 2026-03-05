@@ -17,18 +17,23 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import ClusteringVisualization from "./ClusteringVisualization";
+import PythonCodeButton from "../PythonCodeButton";
+import { generateKMeansCode, generateDBSCANCode } from "@/lib/python-codegen";
 
 interface ArrayData {
   size: any;
   ndim: number;
+  dtype?: string;
   data: any[];
 }
 
 interface ClusteringPanelProps {
   arrayData: ArrayData;
+  fileName?: string;
+  arrayName?: string;
 }
 
-export default function ClusteringPanel({ arrayData }: ClusteringPanelProps) {
+export default function ClusteringPanel({ arrayData, fileName = "data.npz", arrayName = "arr" }: ClusteringPanelProps) {
   const [algorithm, setAlgorithm] = useState("kmeans");
   const [normalize, setNormalize] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -202,6 +207,16 @@ export default function ClusteringPanel({ arrayData }: ClusteringPanelProps) {
               centroids={results.centroids}
               algorithm={algorithm}
             />
+
+            <div className="mt-4">
+              <PythonCodeButton
+                generateCode={() =>
+                  algorithm === "kmeans"
+                    ? generateKMeansCode(fileName, arrayName, nClusters, normalize)
+                    : generateDBSCANCode(fileName, arrayName, eps, minSamples, normalize)
+                }
+              />
+            </div>
           </CardContent>
         </Card>
       )}

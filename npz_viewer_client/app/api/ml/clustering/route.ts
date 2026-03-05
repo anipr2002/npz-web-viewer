@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { kmeans } from 'ml-kmeans';
 import { standardScale } from '@/lib/ml/standard-scaler';
+import { requirePremium, requireRateLimit } from '@/lib/server-premium';
 
 // density-clustering has no types, so we require it
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -18,6 +19,18 @@ interface ClusteringRequest {
 }
 
 export async function POST(request: Request) {
+  // Check rate limit first
+  const rateLimitResponse = await requireRateLimit('clustering');
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
+  // Check premium access
+  const premiumCheck = await requirePremium();
+  if (premiumCheck instanceof Response) {
+    return premiumCheck;
+  }
+
   try {
     const body: ClusteringRequest = await request.json();
     const { array, algorithm, normalize, params } = body;

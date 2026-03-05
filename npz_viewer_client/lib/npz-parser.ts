@@ -4,25 +4,44 @@ import { parseNpy } from './npy-parser';
 interface ArrayData {
   size: number[];
   ndim: number;
+  dtype: string;
   data: any[];
 }
 
 type ParsedFiles = Record<string, Record<string, ArrayData>>;
 
-const MAX_ROWS = 200;
-const MAX_COLS = 200;
-const MAX_FILE_SIZE_MB = 50;
+export interface ParseLimits {
+  maxRows: number;
+  maxCols: number;
+  maxFileSizeMB: number;
+}
 
-function validateShape(shape: number[], fileName: string): void {
-  if (shape.length >= 2 && (shape[0] > MAX_ROWS || shape[1] > MAX_COLS)) {
+export const FREE_LIMITS: ParseLimits = {
+  maxRows: 50,
+  maxCols: 50,
+  maxFileSizeMB: 50,
+};
+
+export const PREMIUM_LIMITS: ParseLimits = {
+  maxRows: 1000,
+  maxCols: 1000,
+  maxFileSizeMB: 200,
+};
+
+/** Threshold (total cells) above which we show a performance warning */
+export const LARGE_DATASET_THRESHOLD = 100_000;
+
+function validateShape(shape: number[], fileName: string, limits: ParseLimits): void {
+  if (shape.length >= 2 && (shape[0] > limits.maxRows || shape[1] > limits.maxCols)) {
     throw new Error(
-      `Array in "${fileName}" exceeds the ${MAX_ROWS}x${MAX_COLS} limit (got ${shape[0]}x${shape[1]})`
+      `Array in "${fileName}" exceeds the ${limits.maxRows}x${limits.maxCols} limit (got ${shape[0]}x${shape[1]})`
     );
   }
 }
 
 export async function parseNpzFile(
-  file: File
+  file: File,
+  limits: ParseLimits = FREE_LIMITS
 ): Promise<Record<string, ArrayData>> {
   const arrayBuffer = await file.arrayBuffer();
   const zip = await JSZip.loadAsync(arrayBuffer);
@@ -36,11 +55,12 @@ export async function parseNpzFile(
     const parsed = parseNpy(npyBuffer);
     const arrayName = name.replace(/\.npy$/, '');
 
-    validateShape(parsed.shape, `${file.name}/${arrayName}`);
+    validateShape(parsed.shape, `${file.name}/${arrayName}`, limits);
 
     result[arrayName] = {
       size: parsed.shape,
       ndim: parsed.ndim,
+      dtype: parsed.dtype,
       data: parsed.data,
     };
   }
@@ -49,37 +69,42 @@ export async function parseNpzFile(
 }
 
 export async function parseNpyFile(
-  file: File
+  file: File,
+  limits: ParseLimits = FREE_LIMITS
 ): Promise<Record<string, ArrayData>> {
   const arrayBuffer = await file.arrayBuffer();
   const parsed = parseNpy(arrayBuffer);
 
-  validateShape(parsed.shape, file.name);
+  validateShape(parsed.shape, file.name, limits);
 
   return {
     array: {
       size: parsed.shape,
       ndim: parsed.ndim,
+      dtype: parsed.dtype,
       data: parsed.data,
     },
   };
 }
 
-export async function parseFiles(files: File[]): Promise<ParsedFiles> {
+export async function parseFiles(
+  files: File[],
+  limits: ParseLimits = FREE_LIMITS
+): Promise<ParsedFiles> {
   const result: ParsedFiles = {};
 
   for (const file of files) {
     const fileSizeMB = file.size / (1024 * 1024);
-    if (fileSizeMB > MAX_FILE_SIZE_MB) {
-      throw new Error(`File "${file.name}" exceeds the ${MAX_FILE_SIZE_MB}MB limit (${fileSizeMB.toFixed(1)} MB)`);
+    if (fileSizeMB > limits.maxFileSizeMB) {
+      throw new Error(`File "${file.name}" exceeds the ${limits.maxFileSizeMB}MB limit (${fileSizeMB.toFixed(1)} MB)`);
     }
 
     const ext = file.name.toLowerCase().split('.').pop();
 
     if (ext === 'npz') {
-      result[file.name] = await parseNpzFile(file);
+      result[file.name] = await parseNpzFile(file, limits);
     } else if (ext === 'npy') {
-      result[file.name] = await parseNpyFile(file);
+      result[file.name] = await parseNpyFile(file, limits);
     } else {
       throw new Error(`Unsupported file type: ${file.name}`);
     }

@@ -1,82 +1,118 @@
-import React, { useMemo, memo, useState } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import React, { useMemo, memo, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 interface Table2DProps {
   data: number[][];
   fileName: string;
 }
 
-const ROW_DISPLAY_LIMIT = 500;
-
-// A memoized row component to avoid unnecessary re-renders when its props do not change
-const MemoizedTableRow: React.FC<{ row: number[] }> = memo(({ row }) => {
-  return (
-    <TableRow>
-      {row.map((cell, cellIndex) => (
-        <TableCell key={cellIndex} className="text-center">
-          {typeof cell === "number" ? cell.toFixed(4) : cell}
-        </TableCell>
-      ))}
-    </TableRow>
-  );
-});
+const ROW_HEIGHT = 36;
+const COL_WIDTH = 100;
+const HEADER_HEIGHT = 36;
+const MAX_TABLE_HEIGHT = 600;
 
 const Table2D: React.FC<Table2DProps> = ({ data }) => {
-  const [showAll, setShowAll] = useState(false);
+  const parentRef = useRef<HTMLDivElement>(null);
 
-  const isTruncated = data.length > ROW_DISPLAY_LIMIT;
-  const displayData = showAll ? data : data.slice(0, ROW_DISPLAY_LIMIT);
+  const rowCount = data.length;
+  const colCount = data[0]?.length ?? 0;
 
-  // Memoize header cells so they are only recalculated if the data changes
-  const headerCells = useMemo(
-    () =>
-      data[0].map((_, colIndex) => (
-        <TableHead key={colIndex} className="text-center">
-          Column {colIndex + 1}
-        </TableHead>
-      )),
-    [data]
+  const tableHeight = Math.min(
+    rowCount * ROW_HEIGHT + HEADER_HEIGHT,
+    MAX_TABLE_HEIGHT
   );
 
-  // Memoize table rows
-  const tableRows = useMemo(
-    () =>
-      displayData.map((row, rowIndex) => (
-        <MemoizedTableRow key={rowIndex} row={row} />
-      )),
-    [displayData]
-  );
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 20,
+  });
+
+  const colVirtualizer = useVirtualizer({
+    horizontal: true,
+    count: colCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => COL_WIDTH,
+    overscan: 10,
+  });
+
+  const totalWidth = colVirtualizer.getTotalSize();
+  const totalHeight = rowVirtualizer.getTotalSize();
 
   return (
     <div>
-      {isTruncated && (
-        <div className="flex items-center justify-between mb-2 text-sm text-muted-foreground">
-          <span>
-            Showing {showAll ? data.length : ROW_DISPLAY_LIMIT} of {data.length} rows
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAll((prev) => !prev)}
+      <div className="text-xs text-muted-foreground mb-2">
+        {rowCount} rows x {colCount} columns
+      </div>
+      <div
+        ref={parentRef}
+        className="overflow-auto border rounded-md"
+        style={{ height: tableHeight, maxWidth: "100%" }}
+      >
+        <div
+          style={{
+            width: totalWidth,
+            height: totalHeight + HEADER_HEIGHT,
+            position: "relative",
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              position: "sticky",
+              top: 0,
+              height: HEADER_HEIGHT,
+              zIndex: 10,
+            }}
+            className="bg-muted"
           >
-            {showAll ? "Show fewer rows" : "Show all rows"}
-          </Button>
+            {colVirtualizer.getVirtualItems().map((virtualCol) => (
+              <div
+                key={virtualCol.key}
+                className="absolute top-0 flex items-center justify-center text-xs font-medium text-muted-foreground border-b border-r"
+                style={{
+                  left: virtualCol.start,
+                  width: virtualCol.size,
+                  height: HEADER_HEIGHT,
+                }}
+              >
+                Col {virtualCol.index + 1}
+              </div>
+            ))}
+          </div>
+
+          {/* Body */}
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+            <div
+              key={virtualRow.key}
+              className="absolute left-0"
+              style={{
+                top: virtualRow.start + HEADER_HEIGHT,
+                height: virtualRow.size,
+                width: totalWidth,
+              }}
+            >
+              {colVirtualizer.getVirtualItems().map((virtualCol) => {
+                const value = data[virtualRow.index][virtualCol.index];
+                return (
+                  <div
+                    key={virtualCol.key}
+                    className="absolute top-0 flex items-center justify-center text-sm border-b border-r tabular-nums"
+                    style={{
+                      left: virtualCol.start,
+                      width: virtualCol.size,
+                      height: virtualRow.size,
+                    }}
+                  >
+                    {typeof value === "number" ? value.toFixed(4) : value}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
-      )}
-      <Table>
-        <TableHeader>
-          <TableRow>{headerCells}</TableRow>
-        </TableHeader>
-        <TableBody>{tableRows}</TableBody>
-      </Table>
+      </div>
     </div>
   );
 };

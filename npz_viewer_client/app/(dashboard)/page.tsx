@@ -4,7 +4,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import BgNoiseWrapper from "@/components/ui/texture-wrapper";
 import Script from "next/script";
-//
+import AuthButton from "@/components/AuthButton";
+import RevenueGoal from "@/components/dashboard/RevenueGoal";
+
 export default function Home() {
   return (
     <BgNoiseWrapper url="/cult-noise.png">
@@ -49,6 +51,11 @@ export default function Home() {
         />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <RevenueGoal />
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+            <AuthButton />
+          </div>
+
           <div className="text-center mb-12">
             <div className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl md:text-6xl">
               <span className="block">NPZ Viewer</span>

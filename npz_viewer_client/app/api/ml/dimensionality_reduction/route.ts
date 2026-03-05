@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PCA } from 'ml-pca';
+import { requirePremium, requireRateLimit } from '@/lib/server-premium';
 
 interface DimReductionRequest {
   array: number[][];
@@ -10,6 +11,18 @@ interface DimReductionRequest {
 }
 
 export async function POST(request: Request) {
+  // Check rate limit first
+  const rateLimitResponse = await requireRateLimit('dimensionalityReduction');
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
+  // Check premium access
+  const premiumCheck = await requirePremium();
+  if (premiumCheck instanceof Response) {
+    return premiumCheck;
+  }
+
   try {
     const body: DimReductionRequest = await request.json();
     const { array, algorithm, params } = body;

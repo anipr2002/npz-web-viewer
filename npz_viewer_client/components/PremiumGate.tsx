@@ -44,7 +44,7 @@ export default function PremiumGate({ children, feature }: PremiumGateProps) {
           <RateLimitedCheckoutButton
             className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
           >
-            Unlock for $3.49
+            Unlock from $3.49
           </RateLimitedCheckoutButton>
         ) : (
           <p className="text-xs text-muted-foreground">

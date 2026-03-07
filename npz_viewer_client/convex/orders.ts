@@ -2,6 +2,7 @@ import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "./users";
 import { polar } from "./polar";
+import { getPaidProOrderAmountCents, isPaidProOrder } from "./premium";
 
 export const upsertOrder = internalMutation({
   args: {
@@ -59,8 +60,8 @@ export const getTotalRevenue = query({
       .collect();
 
     const total = orders
-      .filter((o) => o.status === "paid" || o.billingReason === "purchase")
-      .reduce((sum, o) => sum + o.amount, 0);
+      .filter(isPaidProOrder)
+      .reduce((sum, o) => sum + getPaidProOrderAmountCents(o), 0);
 
     // amount is in cents
     return total;

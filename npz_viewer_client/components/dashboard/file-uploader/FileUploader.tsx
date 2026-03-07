@@ -120,7 +120,7 @@ export default function FileUploader() {
               <RateLimitedCheckoutButton
                 className="inline-flex w-fit items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
               >
-                Unlock for $3.49
+                Unlock from $3.49
               </RateLimitedCheckoutButton>
             ) : (
               <span className="text-xs">Sign in to upgrade.</span>

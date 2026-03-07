@@ -3,43 +3,91 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { WebhookEvent } from "@clerk/backend";
 import { Webhook } from "svix";
-import { polar } from "./polar";
+import {
+  Webhook as PolarWebhook,
+  WebhookVerificationError as PolarWebhookVerificationError,
+} from "standardwebhooks";
+import { getPolarOrderAmountCents } from "./premium";
 
 const http = httpRouter();
 
-// Register Polar webhook routes with order handling for one-time purchases
-polar.registerRoutes(http, {
+function verifyPolarWebhook(requestBody: string, headers: Record<string, string>) {
+  const base64Secret = Buffer.from(process.env.POLAR_WEBHOOK_SECRET!, "utf-8").toString(
+    "base64",
+  );
+  const webhook = new PolarWebhook(base64Secret);
+  return webhook.verify(requestBody, headers) as unknown;
+}
+
+function toIsoString(value: string | Date) {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+type PolarOrderEvent = {
+  type: string;
+  data: {
+    id: string;
+    customerId: string;
+    productId: string | null;
+    status: string;
+    billingReason: string;
+    totalAmount: number;
+    subtotalAmount: number;
+    netAmount: number;
+    taxAmount: number;
+    currency: string;
+    createdAt: string | Date;
+    items: Array<{ amount: number; taxAmount: number }>;
+  };
+};
+
+http.route({
   path: "/polar/events",
-  events: {
-    "order.created": async (ctx, event) => {
-      const order = event.data;
-      if (!order.productId) return;
-      await ctx.runMutation(internal.orders.upsertOrder, {
-        polarOrderId: order.id,
-        polarCustomerId: order.customerId,
-        productId: order.productId,
-        status: order.status,
-        billingReason: order.billingReason,
-        amount: order.totalAmount,
-        currency: order.currency,
-        createdAt: order.createdAt.toISOString(),
-      });
-    },
-    "order.paid": async (ctx, event) => {
-      const order = event.data;
-      if (!order.productId) return;
-      await ctx.runMutation(internal.orders.upsertOrder, {
-        polarOrderId: order.id,
-        polarCustomerId: order.customerId,
-        productId: order.productId,
-        status: order.status,
-        billingReason: order.billingReason,
-        amount: order.totalAmount,
-        currency: order.currency,
-        createdAt: order.createdAt.toISOString(),
-      });
-    },
-  },
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.text();
+    const headers = Object.fromEntries(request.headers.entries());
+
+    try {
+      const event = verifyPolarWebhook(body, headers) as PolarOrderEvent;
+
+      switch (event.type) {
+        case "order.created":
+        case "order.paid":
+        case "order.updated":
+        case "order.refunded": {
+          const order = event.data;
+          if (!order.productId) {
+            return new Response("Accepted", { status: 202 });
+          }
+
+          await ctx.runMutation(internal.orders.upsertOrder, {
+            polarOrderId: order.id,
+            polarCustomerId: order.customerId,
+            productId: order.productId,
+            status: order.status,
+            billingReason: order.billingReason,
+            amount: getPolarOrderAmountCents(order),
+            currency: order.currency,
+            createdAt: toIsoString(order.createdAt),
+          });
+          break;
+        }
+        default:
+          break;
+      }
+
+      return new Response("Accepted", { status: 202 });
+    } catch (error) {
+      if (error instanceof PolarWebhookVerificationError) {
+        console.error("Error verifying Polar webhook event", error);
+        return new Response("Forbidden", { status: 403 });
+      }
+
+      console.error("Error processing Polar webhook event", error);
+      return new Response("Accepted", { status: 202 });
+    }
+  }),
 });
 
 http.route({

@@ -11,6 +11,7 @@
 import type * as http from "../http.js";
 import type * as orders from "../orders.js";
 import type * as polar from "../polar.js";
+import type * as premium from "../premium.js";
 import type * as rateLimiter from "../rateLimiter.js";
 import type * as users from "../users.js";
 
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   orders: typeof orders;
   polar: typeof polar;
+  premium: typeof premium;
   rateLimiter: typeof rateLimiter;
   users: typeof users;
 }>;

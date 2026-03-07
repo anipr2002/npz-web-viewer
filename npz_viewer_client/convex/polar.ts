@@ -1,12 +1,18 @@
 import { Polar } from "@convex-dev/polar";
-import { components } from "./_generated/api";
+import { ordersList } from "@polar-sh/sdk/funcs/ordersList";
+import { api, components, internal } from "./_generated/api";
 import { DataModel } from "./_generated/dataModel";
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "./users";
 import { rateLimiter } from "./rateLimiter";
-
-const PRO_PRODUCT_ID = "08c724e1-1539-4a75-ae66-b10345d0c171";
+import {
+  blocksNewProCheckout,
+  getPolarOrderAmountCents,
+  getPaidProOrderAmountCents,
+  isPaidProOrder,
+  PRO_PRODUCT_ID,
+} from "./premium";
 
 export const polar = new Polar<DataModel, { pro: string }>(components.polar, {
   server: "production",
@@ -30,6 +36,51 @@ const {
   generateCustomerPortalUrl,
 } = polar.api();
 
+export const getProCheckoutEligibility = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) {
+      return {
+        canCheckout: false,
+        reason: "not_authenticated" as const,
+      };
+    }
+
+    const customer = await polar.getCustomerByUserId(ctx, user.externalId);
+    if (!customer) {
+      return {
+        canCheckout: true,
+        reason: "eligible" as const,
+      };
+    }
+
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("byPolarCustomerId", (q) => q.eq("polarCustomerId", customer.id))
+      .collect();
+
+    if (orders.some(isPaidProOrder)) {
+      return {
+        canCheckout: false,
+        reason: "already_purchased" as const,
+      };
+    }
+
+    if (orders.some(blocksNewProCheckout)) {
+      return {
+        canCheckout: false,
+        reason: "checkout_pending" as const,
+      };
+    }
+
+    return {
+      canCheckout: true,
+      reason: "eligible" as const,
+    };
+  },
+});
+
 // Rate-limited checkout link generation
 export const generateCheckoutLink = action({
   args: {
@@ -39,6 +90,17 @@ export const generateCheckoutLink = action({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("User not authenticated");
+
+    const eligibility = await ctx.runQuery(api.polar.getProCheckoutEligibility, {});
+    if (!eligibility.canCheckout) {
+      if (eligibility.reason === "already_purchased") {
+        throw new Error("You already own Pro.");
+      }
+      if (eligibility.reason === "checkout_pending") {
+        throw new Error("You already have a Pro checkout in progress.");
+      }
+      throw new Error("User not authenticated");
+    }
 
     // Check rate limit (per-user)
     const status = await rateLimiter.limit(ctx, "checkout", {
@@ -62,6 +124,43 @@ export const generateCheckoutLink = action({
 
 export { getConfiguredProducts, generateCustomerPortalUrl };
 
+export const syncProOrdersFromPolar = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const pages = await ordersList(polar.polar, {
+      productId: PRO_PRODUCT_ID,
+      limit: 100,
+    });
+
+    let synced = 0;
+
+    for await (const page of pages) {
+      if (!page.ok) {
+        throw page.error;
+      }
+
+      for (const order of page.value.result.items) {
+        if (!order.productId) continue;
+
+        await ctx.runMutation(internal.orders.upsertOrder, {
+          polarOrderId: order.id,
+          polarCustomerId: order.customerId,
+          productId: order.productId,
+          status: order.status,
+          billingReason: order.billingReason,
+          amount: getPolarOrderAmountCents(order),
+          currency: order.currency,
+          createdAt: order.createdAt.toISOString(),
+        });
+
+        synced += 1;
+      }
+    }
+
+    return { synced };
+  },
+});
+
 export const getProOrderDetails = query({
   args: {},
   handler: async (ctx) => {
@@ -78,16 +177,14 @@ export const getProOrderDetails = query({
       )
       .collect();
 
-    const proOrder = orders.find(
-      (order) =>
-        order.productId === PRO_PRODUCT_ID &&
-        (order.status === "paid" || order.billingReason === "purchase"),
-    );
+    const proOrder = orders
+      .filter(isPaidProOrder)
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
 
     if (!proOrder) return null;
 
     return {
-      amount: proOrder.amount,
+      amount: getPaidProOrderAmountCents(proOrder),
       currency: proOrder.currency,
       purchasedAt: proOrder.createdAt,
       status: proOrder.status,
@@ -113,10 +210,6 @@ export const isPremium = query({
       )
       .collect();
 
-    return orders.some(
-      (order) =>
-        order.productId === PRO_PRODUCT_ID &&
-        (order.status === "paid" || order.billingReason === "purchase"),
-    );
+    return orders.some(isPaidProOrder);
   },
 });

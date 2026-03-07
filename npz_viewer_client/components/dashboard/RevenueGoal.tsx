@@ -5,6 +5,8 @@ import { Coffee, Crown, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import RateLimitedCheckoutButton from "@/components/RateLimitedCheckoutButton";
 import { useAuth } from "@clerk/nextjs";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 /* ─────────────────────────────────────────────────────────
  * ANIMATION STORYBOARD
@@ -82,8 +84,9 @@ function ProgressRing({ percent }: { percent: number }) {
 
 export default function RevenueGoal() {
   const [open, setOpen] = useState(false);
-  const [revenue, setRevenue] = useState({ polar: 0, bmac: 0 });
+  const [bmacRevenue, setBmacRevenue] = useState(0);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const polarRevenueCents = useQuery(api.orders.getTotalRevenue, {});
 
   const handleMouseEnter = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -97,12 +100,13 @@ export default function RevenueGoal() {
   useEffect(() => {
     fetch("/api/revenue")
       .then((r) => r.json())
-      .then((d) => setRevenue({ polar: d.polar ?? 0, bmac: d.bmac ?? 0 }))
+      .then((d) => setBmacRevenue(d.bmac ?? 0))
       .catch(() => {});
   }, []);
 
   const { isSignedIn } = useAuth();
-  const collected = revenue.polar + revenue.bmac;
+  const polarRevenue = (polarRevenueCents ?? 0) / 100;
+  const collected = polarRevenue + bmacRevenue;
   const percent = Math.min((collected / GOAL_AMOUNT) * 100, 100);
 
   return (
@@ -152,13 +156,13 @@ export default function RevenueGoal() {
         </div>
 
         {/* Breakdown */}
-        {(revenue.polar > 0 || revenue.bmac > 0) && (
+        {(polarRevenue > 0 || bmacRevenue > 0) && (
           <div className="flex gap-3 mb-2.5 text-[10px] text-gray-400 dark:text-gray-500">
-            {revenue.polar > 0 && (
-              <span>Polar: {formatter.format(revenue.polar)}</span>
+            {polarRevenue > 0 && (
+              <span>Polar: {formatter.format(polarRevenue)}</span>
             )}
-            {revenue.bmac > 0 && (
-              <span>BMaC: {formatter.format(revenue.bmac)}</span>
+            {bmacRevenue > 0 && (
+              <span>BMaC: {formatter.format(bmacRevenue)}</span>
             )}
           </div>
         )}
@@ -179,11 +183,11 @@ export default function RevenueGoal() {
             <p className="text-[11px] text-gray-500 dark:text-gray-400">
               {isSignedIn ? (
                 <RateLimitedCheckoutButton className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline text-[11px]">
-                  Get Pro — $3.49
+                  Get Pro — from $3.49
                 </RateLimitedCheckoutButton>
               ) : (
                 <Link href="/sign-in" className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                  Get Pro — $3.49
+                  Get Pro — from $3.49
                 </Link>
               )}
               <span className="text-gray-400 dark:text-gray-500"> · removes ads, unlocks features</span>

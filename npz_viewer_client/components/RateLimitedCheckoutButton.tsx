@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, ReactNode } from "react";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@clerk/nextjs";
 
 interface RateLimitedCheckoutButtonProps {
   className?: string;
@@ -15,10 +16,35 @@ export default function RateLimitedCheckoutButton({
   className,
   children,
 }: RateLimitedCheckoutButtonProps) {
+  const { isSignedIn } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const generateCheckout = useAction(api.polar.generateCheckoutLink);
+  const eligibility = useQuery(
+    api.polar.getProCheckoutEligibility,
+    isSignedIn ? {} : "skip",
+  );
+
+  const blockedReason = eligibility?.reason;
+  const isBlocked =
+    blockedReason === "already_purchased" || blockedReason === "checkout_pending";
+
+  const label =
+    blockedReason === "already_purchased"
+      ? "Already purchased"
+      : blockedReason === "checkout_pending"
+        ? "Checkout pending"
+        : children;
 
   const handleClick = async () => {
+    if (isBlocked) {
+      toast.error(
+        blockedReason === "already_purchased"
+          ? "You already own Pro."
+          : "You already have a Pro checkout in progress.",
+      );
+      return;
+    }
+
     setIsLoading(true);
     try {
       const result = await generateCheckout({
@@ -43,8 +69,9 @@ export default function RateLimitedCheckoutButton({
   return (
     <button
       onClick={handleClick}
-      disabled={isLoading}
+      disabled={isLoading || isBlocked}
       className={className}
+      aria-disabled={isLoading || isBlocked}
     >
       {isLoading ? (
         <span className="inline-flex items-center gap-2">
@@ -52,7 +79,7 @@ export default function RateLimitedCheckoutButton({
           Processing...
         </span>
       ) : (
-        children
+        label
       )}
     </button>
   );

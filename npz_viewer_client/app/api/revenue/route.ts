@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRateLimit } from "@/lib/server-premium";
 
 // Cache results for 5 minutes
-let cached: { bmac: number; polar: number; fetchedAt: number } | null = null;
+let cached: { bmac: number; fetchedAt: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000;
 
 async function fetchBmacTotal(): Promise<number> {
@@ -35,25 +35,9 @@ async function fetchBmacTotal(): Promise<number> {
   return total;
 }
 
-async function fetchPolarTotal(): Promise<number> {
-  const token = process.env.POLAR_ACCESS_TOKEN;
-  if (!token) return 0;
-
-  const res = await fetch(
-    `https://api.polar.sh/v1/metrics?start_date=2024-01-01&end_date=${new Date().toISOString().split("T")[0]}&interval=year`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-
-  if (!res.ok) return 0;
-
-  const data = await res.json();
-  // revenue is in cents
-  return (data.totals?.revenue ?? 0) / 100;
-}
-
 export async function GET() {
   // Check rate limit first
-  const rateLimitResponse = await requireRateLimit('revenue');
+  const rateLimitResponse = await requireRateLimit("revenue");
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
@@ -62,7 +46,7 @@ export async function GET() {
     const now = Date.now();
     if (cached && now - cached.fetchedAt < CACHE_TTL) {
       return NextResponse.json(
-        { bmac: cached.bmac, polar: cached.polar },
+        { bmac: cached.bmac },
         {
           headers: {
             "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
@@ -71,15 +55,12 @@ export async function GET() {
       );
     }
 
-    const [bmac, polar] = await Promise.all([
-      fetchBmacTotal(),
-      fetchPolarTotal(),
-    ]);
+    const bmac = await fetchBmacTotal();
 
-    cached = { bmac, polar, fetchedAt: now };
+    cached = { bmac, fetchedAt: now };
 
     return NextResponse.json(
-      { bmac, polar },
+      { bmac },
       {
         headers: {
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
@@ -87,6 +68,6 @@ export async function GET() {
       },
     );
   } catch {
-    return NextResponse.json({ bmac: 0, polar: 0 });
+    return NextResponse.json({ bmac: 0 });
   }
 }
